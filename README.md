@@ -8,16 +8,36 @@ Unofficial. Scores come from the official leaderboards on [pgatq.bluegolf.com](h
 
 - `docs/` is the site, served by GitHub Pages. It is one static page that reads `docs/data.json`.
 - `scraper/scrape.mjs` reads the bluegolf schedule, then every site's leaderboard, and writes `docs/data.json`.
-- `.github/workflows/scrape.yml` runs the scraper every 15 minutes during the day (US Eastern) and hourly overnight, committing `data.json` only when something changed. Pages redeploys automatically.
+- `scripts/update-local.sh` runs the scraper and pushes `data.json` when it changed. It has to run from a home internet connection: bluegolf sits behind AWS WAF, which challenges cloud IPs (GitHub Actions, VPSes) and never lets them through. Pages redeploys on every push.
+- `scripts/install-mac.sh` installs a launchd job that runs the updater every 15 minutes on a Mac.
 
 ## Setup (one time)
 
-1. Push this repo to GitHub (public is fine; Actions minutes are free for public repos).
-2. **Settings → Pages → Build and deployment**: Source "Deploy from a branch", branch `main`, folder `/docs`.
-3. **Settings → Actions → General → Workflow permissions**: "Read and write permissions" (so the job can commit `data.json`).
-4. **Actions → Update leaderboards → Run workflow** to do the first scrape. After that it runs on its own.
+GitHub: push the repo (public), then **Settings → Pages**: deploy from branch `main`, folder `/docs`. The site is at `https://<user>.github.io/<repo>/`.
 
-The site is then at `https://<user>.github.io/<repo>/`. For a custom domain, add it under Settings → Pages.
+On the Mac that will run the updater (plugged in, lid open, on home Wi-Fi):
+
+```
+# 1. Tools (skip any you already have)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install node gh
+gh auth login            # choose GitHub.com, HTTPS, log in with browser
+
+# 2. The repo
+cd ~ && gh repo clone <user>/<repo> qschool-finder && cd qschool-finder
+npm ci --prefix scraper
+cd scraper && npx playwright install chromium && cd ..
+
+# 3. Test one scrape (should end with "wrote ... 28 sites, N players")
+node scraper/scrape.mjs
+
+# 4. Schedule it
+./scripts/install-mac.sh
+```
+
+Keep the Mac from sleeping: System Settings → Battery (or Energy Saver) → "Prevent automatic sleeping when the display is off" on, and leave the lid open (a MacBook with the lid closed sleeps unless an external display is attached). The screen itself can turn off.
+
+Check it's working: `tail -f ~/qschool-finder/update.log`, or look for commits by the script on GitHub.
 
 ## Local
 

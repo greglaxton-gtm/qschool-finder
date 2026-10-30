@@ -1,11 +1,8 @@
 name: Update leaderboards
 
+# Manual only: GitHub's cloud IPs are challenged by bluegolf's WAF, so the
+# scheduled scrape runs from a home machine (see scripts/). Kept for testing.
 on:
-  schedule:
-    # Every 15 min from 7am–11pm US Eastern (11:00–03:00 UTC), hourly overnight.
-    - cron: "*/15 11-23 * * *"
-    - cron: "*/15 0-3 * * *"
-    - cron: "0 4-10 * * *"
   workflow_dispatch:
 
 permissions:
