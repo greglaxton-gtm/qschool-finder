@@ -26,6 +26,7 @@ jobs:
           cache: npm
           cache-dependency-path: scraper/package-lock.json
       - run: npm ci --prefix scraper
+      - run: npx --prefix scraper playwright install --with-deps chromium
       - run: node scraper/scrape.mjs
       - name: Commit data.json if it changed
         run: |

@@ -2,6 +2,12 @@
   "name": "qschool-scraper",
   "private": true,
   "type": "module",
-  "scripts": { "scrape": "node scrape.mjs", "test": "node scrape.mjs --test" },
-  "dependencies": { "jsdom": "24.1.0" }
+  "scripts": {
+    "scrape": "node scrape.mjs",
+    "test": "node scrape.mjs --test"
+  },
+  "dependencies": {
+    "jsdom": "24.1.0",
+    "playwright": "^1.48.2"
+  }
 }

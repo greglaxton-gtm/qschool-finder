@@ -14,19 +14,45 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 const tx = (el) => (el?.textContent || "").replace(/\s+/g, " ").trim();
 
+// bluegolf sits behind AWS WAF, which hands non-browser clients a JavaScript challenge
+// (HTTP 405 "Human Verification"). A real browser passes it silently, so page loads go
+// through headless Chromium and later requests reuse its cookies via same-origin fetch.
+let browser = null, page = null;
+async function getPage() {
+  if (page) return page;
+  const { chromium } = await import("playwright");
+  browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ userAgent: UA, locale: "en-US", viewport: { width: 1280, height: 900 } });
+  page = await ctx.newPage();
+  await page.goto(`${BASE}/schedule/index.htm?display=date`, { waitUntil: "domcontentloaded", timeout: 60000 });
+  // Wait out the WAF challenge: it reloads into the real page once the token is issued.
+  try {
+    await page.waitForFunction(() => !!document.querySelector('a[href*="/event/"]'), null, { timeout: 60000 });
+  } catch {
+    const title = await page.title();
+    throw new Error(`Could not get past bluegolf's verification page (title: "${title}").`);
+  }
+  return page;
+}
 async function fetchText(url, tries = 3) {
+  const p = await getPage();
   for (let i = 0; i < tries; i++) {
     try {
-      const r = await fetch(url, { headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml", "accept-language": "en-US,en;q=0.9" }, redirect: "follow" });
-      const body = await r.text();
-      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}: ${body.replace(/\s+/g, " ").slice(0, 300)}`);
-      return body;
+      const r = await p.evaluate(async (u) => {
+        const res = await fetch(u, { credentials: "include" });
+        return { ok: res.ok, status: res.status, text: await res.text() };
+      }, url);
+      if (!r.ok || /<title>\s*Human Verification/i.test(r.text)) throw new Error(`HTTP ${r.status} for ${url}`);
+      return r.text;
     } catch (e) {
       if (i === tries - 1) throw e;
-      await new Promise((res) => setTimeout(res, 1500 * (i + 1)));
+      await new Promise((res) => setTimeout(res, 2000 * (i + 1)));
+      // A fresh navigation renews the WAF token if it expired mid-run.
+      await p.goto(`${BASE}/schedule/index.htm?display=date`, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
     }
   }
 }
+async function closeBrowser() { try { await browser?.close(); } catch {} }
 
 export function parseSchedule(html) {
   const doc = new JSDOM(html).window.document;
@@ -113,7 +139,8 @@ async function main() {
     return;
   }
 
-  const schedule = parseSchedule(await fetchText(`${BASE}/schedule/index.htm?display=date`));
+  const p = await getPage();
+  const schedule = parseSchedule(await p.content());
   if (!schedule.length) throw new Error("Schedule parsed to zero events; page layout may have changed.");
   console.log(`schedule: ${schedule.length} events`);
 
@@ -149,4 +176,4 @@ async function main() {
   console.log(`wrote ${OUT}: ${sites.length} sites, ${total} players`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().then(closeBrowser, async (e) => { console.error(e); await closeBrowser(); process.exit(1); });
