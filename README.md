@@ -15,23 +15,24 @@ Unofficial. Scores come from the official leaderboards on [pgatq.bluegolf.com](h
 
 GitHub: push the repo (public), then **Settings → Pages**: deploy from branch `main`, folder `/docs`. The site is at `https://<user>.github.io/<repo>/`.
 
-On the Mac that will run the updater (plugged in, lid open, on home Wi-Fi):
+On the Mac that will run the updater (plugged in, lid open, on home Wi-Fi). Works on macOS 12 Monterey and later, so a 2016-era MacBook is fine; Playwright is pinned to 1.48.2 for that reason, so don't bump it.
+
+1. Install Node 22 LTS from https://nodejs.org (the macOS installer; Node 22 is the last line that runs on Monterey).
+2. Install GitHub CLI from https://github.com/cli/cli/releases (the `gh_*_macOS_amd64.pkg` file for an Intel Mac).
+3. In Terminal:
 
 ```
-# 1. Tools (skip any you already have)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install node gh
 gh auth login            # choose GitHub.com, HTTPS, log in with browser
 
-# 2. The repo
+# The repo
 cd ~ && gh repo clone <user>/<repo> qschool-finder && cd qschool-finder
 npm ci --prefix scraper
 cd scraper && npx playwright install chromium && cd ..
 
-# 3. Test one scrape (should end with "wrote ... 28 sites, N players")
+# Test one scrape (should end with "wrote ... 28 sites, N players")
 node scraper/scrape.mjs
 
-# 4. Schedule it
+# Schedule it
 ./scripts/install-mac.sh
 ```
 
