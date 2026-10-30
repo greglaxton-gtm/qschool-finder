@@ -10,16 +10,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(HERE, "../docs/data.json");
 const SEASON = process.env.QS_SEASON || "pgatq26";
 const BASE = `https://pgatq.bluegolf.com/bluegolf/${SEASON}`;
-const UA = "QSchoolFinder/1.0 (+https://github.com; unofficial fan tool; low volume)";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
 const tx = (el) => (el?.textContent || "").replace(/\s+/g, " ").trim();
 
 async function fetchText(url, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
-      const r = await fetch(url, { headers: { "user-agent": UA, accept: "text/html" } });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.text();
+      const r = await fetch(url, { headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml", "accept-language": "en-US,en;q=0.9" }, redirect: "follow" });
+      const body = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}: ${body.replace(/\s+/g, " ").slice(0, 300)}`);
+      return body;
     } catch (e) {
       if (i === tries - 1) throw e;
       await new Promise((res) => setTimeout(res, 1500 * (i + 1)));
