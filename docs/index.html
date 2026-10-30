@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Q-School Finder</title>
+<meta name="description" content="Search every PGA TOUR Q-School leaderboard at once. Find any player, see whether they're inside the number, and follow them through every stage.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%231f6b3a'/%3E%3Ccircle cx='13' cy='13' r='6' fill='none' stroke='%23fff' stroke-width='3'/%3E%3Cpath d='M17.5 17.5 24 24' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column, sticky search bar, scoreboard-style rows. Dense, scannable on a phone at the course. */
+:root{
+  --bg:#f6f5f0; --surface:#ffffff; --fg:#17201a; --muted:#5f6b63; --line:#d9ddd6;
+  --accent:#1f6b3a; --accent-fg:#ffffff; --accent-soft:#e3efe6;
+  --good:#1f6b3a; --good-soft:#dff0e4; --warn:#9a6a00; --warn-soft:#fbefcf; --bad:#a1382e; --bad-soft:#f6e1de; --neutral-soft:#e9ebe6;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#141916; --surface:#1d2420; --fg:#eef1ea; --muted:#9aa69d; --line:#2f3a33;
+  --accent:#5fbf7f; --accent-fg:#0f1a13; --accent-soft:#1f3327;
+  --good:#6fcf8e; --good-soft:#1f3327; --warn:#e2b64a; --warn-soft:#3a2f12; --bad:#ef8a7e; --bad-soft:#3d1f1b; --neutral-soft:#2a332d;
+  color-scheme:dark } }
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.4;margin:0}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 48px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+h1{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1 small{font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted);margin-left:8px}
+.meta{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button,.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sticky{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px 10px;display:grid;gap:8px}
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0;font:inherit;font-size:17px;padding:11px 14px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.search input:focus{border-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.chip.sep{border:none;background:none;padding:4px 2px;cursor:default;color:var(--muted)}
+.count{font-size:13px;color:var(--muted);margin:10px 0 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rows{display:grid;gap:6px}
+.row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.star{background:none;border:none;padding:0;font-size:20px;line-height:1;color:var(--line);cursor:pointer}
+.star[aria-pressed="true"]{color:var(--warn)}
+.who{min-width:0}
+.name{font-weight:600;font-size:16px}
+.name .am{font-weight:400;color:var(--muted);font-size:13px}
+.home{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site{font-size:13px;color:var(--muted);margin-top:2px}
+.site a{color:var(--accent);text-decoration:none;font-weight:500}
+.site a:hover{text-decoration:underline}
+.nums{display:grid;grid-template-columns:auto auto;gap:2px 12px;justify-items:end;align-items:center;font-variant-numeric:tabular-nums}
+.pos{font-family:var(--display);font-weight:700;font-size:24px;line-height:1}
+.tot{font-family:var(--mono);font-size:16px;font-weight:500}
+.sub{font-size:12px;color:var(--muted);white-space:nowrap}
+.pill{display:inline-block;font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--neutral-soft);color:var(--fg);white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.rounds{font-family:var(--mono);font-size:12px;color:var(--muted);grid-column:2/4;white-space:nowrap;overflow-x:auto}
+.rounds b{color:var(--fg);font-weight:500}
+h2{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.sitecard{text-align:left;display:grid;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.sitecard .t{font-weight:600;font-size:15px}
+.sitecard .d{font-size:13px;color:var(--muted)}
+.sitecard .s{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-top:2px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);max-width:70ch}
+footer a{color:var(--accent)}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:4px;vertical-align:middle}
+@media (max-width:520px){ .pos{font-size:20px} .tot{font-size:15px} .nums{gap:2px 8px} h1 small{display:block;margin:2px 0 0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Q-School Finder <small>2026 PGA TOUR Q-School presented by Korn Ferry</small></h1>
+    <div class="meta"><span id="synced">Loading…</span></div>
+  </header>
+
+  <div class="sticky">
+    <div class="search"><input id="q" type="search" placeholder="Search a player or hometown across every site" autocomplete="off" aria-label="Search players"></div>
+    <div class="chips" id="chips">
+      <button class="chip" type="button" data-stage="" aria-pressed="true">All stages</button>
+      <button class="chip" type="button" data-stage="Pre-Qualifying">Pre-Q</button>
+      <button class="chip" type="button" data-stage="First Stage">First</button>
+      <button class="chip" type="button" data-stage="Second Stage">Second</button>
+      <button class="chip" type="button" data-stage="Final Stage">Final</button>
+      <span class="chip sep">·</span>
+      <button class="chip" type="button" data-status="" aria-pressed="true">Any status</button>
+      <button class="chip" type="button" data-status="in">Inside number</button>
+      <button class="chip" type="button" data-status="out">Outside</button>
+      <span class="chip sep">·</span>
+      <button class="chip" type="button" id="watchChip" aria-pressed="false">★ Watchlist</button>
+    </div>
+  </div>
+
+  <div id="results"><div class="empty">Loading leaderboards…</div></div>
+
+  <footer>
+    Unofficial. Scores are read from the official <a href="https://pgatq.bluegolf.com/bluegolf/pgatq26/schedule/index.htm?display=date" target="_blank" rel="noopener">PGA TOUR Q-School leaderboards on bluegolf.com</a> about every 15 minutes during play; tap a site name on any row for the official page. Your watchlist is saved in this browser only. Built by a caddie who got tired of clicking into 22 leaderboards.
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const state={sites:[],q:'',stage:'',status:'',watchOnly:false,siteFilter:'',watch:new Set(),synced:''};
+const WATCH_KEY='qs_watch';
+
+// ---------- data shaping ----------
+const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const EXPECTED={'Pre-Qualifying':3,'First Stage':4,'Second Stage':4,'Final Stage':4};
+function shapeSite(raw){
+  const stage=raw.stage||'Other';
+  const exp=EXPECTED[stage]||4;
+  const players=(raw.players||[]).map(p=>{
+    const rs=(p.rounds||[]).concat([p.strokes||'']);
+    const r=rs.slice(0,exp); while(r.length<exp)r.push('');
+    const strokes=p.strokes||rs[exp]||'';
+    const wd=/^(WD|DQ|DNF|DNS)$/i.test(p.pos);
+    return {...p,r,strokes,wd,am:/\(a\)/.test(p.name),sec:p.section||''};
+  });
+  const active=players.filter(p=>!p.wd);
+  const inside=active.filter(p=>/QUALIF|CONTENTION/i.test(p.sec)&&!/NOT/i.test(p.sec));
+  const judge=inside.length?inside:active;
+  const final=judge.length>0&&judge.every(p=>/^F/.test(p.thru)&&p.r.every(x=>x!==''));
+  const started=active.some(p=>p.r[0]!=='');
+  const qsec=(players.find(p=>/QUALIF|CONTENTION/i.test(p.sec)&&!/NOT/i.test(p.sec))||{sec:''}).sec;
+  const qm=qsec.match(/QUALIFIERS?\s*[:(]\s*(\d+)/i)||qsec.match(/\((\d+)\)/);
+  return {...raw,stage,final,started,qual:qm?+qm[1]:null,players};
+}
+function statusOf(p,site){
+  if(p.wd)return {k:'wd',label:p.pos.toUpperCase(),cls:'bad'};
+  if(/^ALTERNATE/i.test(p.sec))return {k:'in',label:'Alternate',cls:'warn'};
+  const inside=/QUALIF|CONTENTION/i.test(p.sec)&&!/NOT/i.test(p.sec);
+  if(site.final)return inside?{k:'in',label:'Qualified',cls:'good'}:{k:'out',label:'Missed',cls:''};
+  return inside?{k:'in',label:'Inside number',cls:'good'}:{k:'out',label:'Outside number',cls:'warn'};
+}
+const stageShort={'Pre-Qualifying':'Pre-Q','First Stage':'1st Stage','Second Stage':'2nd Stage','Final Stage':'Final'};
+function siteLabel(s){ return (s.name||'').replace(/^(Pre[- ]?Qualifying|First Stage|Second Stage|Final Stage)\s*-?\s*/i,'').trim()||s.loc; }
+
+// ---------- rendering ----------
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function matches(p,site){
+  if(state.stage&&site.stage!==state.stage)return false;
+  if(state.siteFilter&&site.id!==state.siteFilter)return false;
+  if(state.watchOnly&&!state.watch.has(norm(p.name)))return false;
+  if(state.status&&statusOf(p,site).k!==state.status)return false;
+  if(state.q){const hay=norm(p.name+' '+p.home); for(const t of state.q.split(/\s+/).filter(Boolean)) if(!hay.includes(t))return false;}
+  return true;
+}
+function rowHTML(p,site){
+  const st=statusOf(p,site);
+  const w=state.watch.has(norm(p.name));
+  const sc=p.cid?`${site.url.replace(/leaderboard\.htm$/,'')}contestant/${p.cid}/scorecard.htm`:site.url;
+  const rounds=p.r.map((x,i)=>x?`R${i+1} <b>${esc(x)}</b>`:`R${i+1} –`).join(' · ')+(p.strokes?` · <b>${esc(p.strokes)}</b>`:'');
+  const nm=esc(p.name).replace(/\(a\)/,'<span class="am">(a)</span>');
+  const today=p.today?`${esc(p.today)} today`:'';
+  const thru=p.thru?`thru ${esc(p.thru)}`:'';
+  return `<div class="row">
+    <button class="star" type="button" data-w="${esc(p.name)}" aria-pressed="${w}" aria-label="Watch ${esc(p.name)}">${w?'★':'☆'}</button>
+    <div class="who"><div class="name">${nm}</div><div class="home">${esc(p.home)}</div>
+      <div class="site">${esc(stageShort[site.stage]||site.stage)} · <a href="${esc(sc)}" target="_blank" rel="noopener">${esc(siteLabel(site))}</a>${site.qual?` · top ${site.qual} advance`:''}</div></div>
+    <div class="nums"><span class="pos">${esc(p.pos)}</span><span class="tot">${esc(p.total||'')}</span><span class="pill ${st.cls}">${st.label}</span><span class="sub">${[today,thru].filter(Boolean).join(' · ')}</span></div>
+    <div class="rounds">${rounds}</div>
+  </div>`;
+}
+function render(){
+  const out=$('#results');
+  if(!state.sites.length){ out.innerHTML=`<div class="empty">No leaderboard data yet. Check back once the first site tees off.</div>`; return; }
+  const hits=[];
+  for(const s of state.sites) for(const p of s.players) if(matches(p,s)) hits.push([p,s]);
+  const browsing=!state.q&&!state.watchOnly&&!state.siteFilter&&!state.status;
+  let html='';
+  if(state.siteFilter){const s=state.sites.find(x=>x.id===state.siteFilter); html+=`<div class="count"><button type="button" id="clearSite">← All sites</button> <span>${esc(s?s.name:'')} · ${esc(s?s.date:'')}${s&&s.qual?` · top ${s.qual} advance`:''} · <a href="${esc(s?s.url:'#')}" target="_blank" rel="noopener">official leaderboard</a></span></div>`;}
+  if(browsing){
+    const w=[]; for(const s of state.sites) for(const p of s.players) if(state.watch.has(norm(p.name))) w.push([p,s]);
+    html+=`<h2>Watchlist</h2>`;
+    html+=w.length?`<div class="rows">${w.map(([p,s])=>rowHTML(p,s)).join('')}</div>`:`<div class="empty">Tap ☆ on any player to follow them here. Watched players stay listed as they move through stages.</div>`;
+    html+=`<h2>Sites</h2><div class="sites">`;
+    for(const s of state.sites){
+      const n=s.players.filter(p=>!p.wd).length;
+      const pill=s.final?'<span class="pill">Final</span>':(s.started?'<span class="pill good"><span class="live"></span>Live</span>':'<span class="pill warn">Not started</span>');
+      html+=`<button class="sitecard" type="button" data-site="${esc(s.id)}"><span class="t">${esc(s.name)}</span><span class="d">${esc([s.venue,s.loc].filter(Boolean).join(' · '))}</span><span class="d">${esc(s.date)}</span><span class="s">${pill} ${n?n+' players':''}${s.qual?` · top ${s.qual} advance`:''}</span></button>`;
+    }
+    html+=`</div>`;
+  } else {
+    const order={in:0,out:1,wd:2};
+    hits.sort((a,b)=>{ if(state.q){const an=norm(a[0].name).startsWith(state.q),bn=norm(b[0].name).startsWith(state.q); if(an!==bn)return an?-1:1;} return (order[statusOf(a[0],a[1]).k]-order[statusOf(b[0],b[1]).k])||(parseInt(a[0].pos.replace(/\D/g,''))||999)-(parseInt(b[0].pos.replace(/\D/g,''))||999); });
+    const shown=hits.slice(0,200);
+    html+=`<div class="count"><span>${hits.length} player${hits.length===1?'':'s'}${hits.length>200?' · showing first 200':''}</span>${state.q?`<button type="button" id="shareBtn">Copy link to this search</button>`:''}</div>`;
+    html+=hits.length?`<div class="rows">${shown.map(([p,s])=>rowHTML(p,s)).join('')}</div>`:`<div class="empty">No player matches. Try a last name only, or clear the stage and status filters.</div>`;
+  }
+  out.innerHTML=html;
+}
+
+// ---------- events ----------
+$('#q').addEventListener('input',e=>{state.q=norm(e.target.value.trim());render();syncUrl();});
+$('#chips').addEventListener('click',e=>{
+  const b=e.target.closest('button.chip'); if(!b)return;
+  if(b.dataset.stage!==undefined){state.stage=b.dataset.stage; document.querySelectorAll('[data-stage]').forEach(x=>x.setAttribute('aria-pressed',x===b));}
+  else if(b.dataset.status!==undefined){state.status=b.dataset.status; document.querySelectorAll('[data-status]').forEach(x=>x.setAttribute('aria-pressed',x===b));}
+  else if(b.id==='watchChip'){state.watchOnly=!state.watchOnly; b.setAttribute('aria-pressed',state.watchOnly);}
+  render();
+});
+$('#results').addEventListener('click',e=>{
+  const star=e.target.closest('.star'); if(star){toggleWatch(star.dataset.w);return;}
+  const sc=e.target.closest('.sitecard'); if(sc){state.siteFilter=sc.dataset.site;render();window.scrollTo({top:0});return;}
+  if(e.target.id==='clearSite'){state.siteFilter='';render();return;}
+  if(e.target.id==='shareBtn'){const u=location.href; const done=()=>{e.target.textContent='Link copied';}; (navigator.clipboard?navigator.clipboard.writeText(u).then(done,()=>{}):null);}
+});
+function syncUrl(){ try{ const u=new URL(location.href); if(state.q)u.searchParams.set('q',$('#q').value.trim()); else u.searchParams.delete('q'); history.replaceState(null,'',u); }catch(e){} }
+
+// ---------- watchlist (this browser only) ----------
+function toggleWatch(name){
+  const k=norm(name); if(state.watch.has(k))state.watch.delete(k); else state.watch.add(k);
+  render(); try{localStorage.setItem(WATCH_KEY,JSON.stringify([...state.watch]));}catch(e){}
+}
+try{JSON.parse(localStorage.getItem(WATCH_KEY)||'[]').forEach(x=>state.watch.add(x));}catch(e){}
+
+// ---------- data ----------
+function apply(data){
+  const order={'Pre-Qualifying':0,'First Stage':1,'Second Stage':2,'Final Stage':3,'Other':4};
+  state.sites=(data.sites||[]).map(shapeSite).sort((a,b)=>(order[a.stage]-order[b.stage])||a.name.localeCompare(b.name));
+  state.synced=data.synced||'';
+  const t=state.synced?new Date(state.synced):null;
+  $('#synced').textContent=t?`Updated ${t.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`:'';
+  render();
+}
+let lastEtag='';
+async function load(){
+  try{
+    const r=await fetch('data.json?t='+Math.floor(Date.now()/60000),{cache:'no-store'});
+    if(!r.ok)throw new Error(r.status);
+    const et=r.headers.get('etag')||''; if(et&&et===lastEtag)return; lastEtag=et;
+    apply(await r.json());
+  }catch(e){ if(!state.sites.length){ $('#results').innerHTML=`<div class="empty">Could not load the leaderboards. Refresh the page to try again.</div>`; $('#synced').textContent=''; } }
+}
+try{ const q=new URL(location.href).searchParams.get('q'); if(q){$('#q').value=q;state.q=norm(q);} }catch(e){}
+load();
+setInterval(load,5*60*1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(); });
+})();
+</script>
+</body>
+</html>

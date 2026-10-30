@@ -1,0 +1,40 @@
+name: Update leaderboards
+
+on:
+  schedule:
+    # Every 15 min from 7am–11pm US Eastern (11:00–03:00 UTC), hourly overnight.
+    - cron: "*/15 11-23 * * *"
+    - cron: "*/15 0-3 * * *"
+    - cron: "0 4-10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scraper/package-lock.json
+      - run: npm ci --prefix scraper
+      - run: node scraper/scrape.mjs
+      - name: Commit data.json if it changed
+        run: |
+          git config user.name "qschool-bot"
+          git config user.email "qschool-bot@users.noreply.github.com"
+          git add docs/data.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "data: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
